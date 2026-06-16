@@ -61,22 +61,24 @@ exports.register = async (req, res, next) => {
 
 // Login user
 exports.login = async (req, res, next) => {
-  const { email, password } = req.body;
+  const { email, username, password } = req.body;
+  const loginIdentifier = email || username;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
+  if (!loginIdentifier || !password) {
+    return res.status(400).json({ error: 'Email or username and password are required.' });
   }
 
   try {
-    // Find user
+    // Find user by email or username
     const result = await db.query(
-      'SELECT id, username, email, password, created_at FROM users WHERE email = $1',
-      [email.toLowerCase()]
+      'SELECT id, username, email, password, created_at FROM users WHERE email = $1 OR username = $2',
+      [loginIdentifier.toLowerCase(), loginIdentifier.toLowerCase()]
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      return res.status(401).json({ error: 'Invalid email/username or password.' });
     }
+
 
     const user = result.rows[0];
 
