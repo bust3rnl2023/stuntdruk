@@ -1,0 +1,33 @@
+{
+  "services": [
+    {
+      "type": "app",
+      "data": {
+        "projectName": "stuntdruk",
+        "serviceName": "web",
+        "source": {
+          "type": "git",
+          "repository": "https://github.com/bust3rnl2023/stuntdruk",
+          "branch": "main"
+        },
+        "build": {
+          "type": "dockerfile",
+          "dockerfilePath": "Dockerfile"
+        },
+        "env": "NODE_ENV=production\nPORT=8080\nDATABASE_URL=postgres://postgres:secure_db_password_123@db:5432/stuntdruk\nJWT_SECRET=replace_this_with_a_long_random_string_in_production\nJWT_EXPIRES_IN=24h",
+        "proxy": {
+          "port": 8080
+        }
+      }
+    },
+    {
+      "type": "postgres",
+      "data": {
+        "projectName": "stuntdruk",
+        "serviceName": "db",
+        "image": "postgres:15-alpine",
+        "password": "secure_db_password_123"
+      }
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
   <h1>Stuntdruk Backend API</h1>
 
-  <p>A production-ready Express API backend with PostgreSQL database persistence and secure JWT authentication. Optimized for deployment on Coolify.</p>
+  <p>A production-ready Express API backend with PostgreSQL database persistence and secure JWT authentication. Optimized for deployment on Easypanel.</p>
 
 </div>
 
@@ -16,7 +16,7 @@
 - **Product Management (CRUD)**:
   - **Anonymous Users**: Read-only access to list and view products.
   - **Authenticated Users**: Full control to Add, Update, and Delete products.
-- **Coolify Ready**: Designed for Traefik routing, stateless horizontal scaling, and secure data persistence.
+- **Easypanel Ready**: Designed for Traefik routing, stateless horizontal scaling, and secure data persistence.
 
 ---
 
@@ -80,24 +80,29 @@ Make sure you have a running PostgreSQL database and update the `.env` variables
 
 ---
 
-## Deploying to Coolify (Self-Hosted VPS)
+## Deploying to Easypanel (Self-Hosted VPS)
 
-This project is fully optimized for **Coolify**. Follow these steps to deploy:
+This project is fully optimized for **Easypanel**. You can deploy it using the **Compose Service** feature:
 
-1. **Create a New Resource** in Coolify:
-   - Select **Docker Compose** or **GitHub Repository**.
-2. **Repository Details**:
-   - Link your GitHub repository `https://github.com/bust3rnl2023/stuntdruk`.
-3. **Environment Setup**:
-   - Coolify will read the `docker-compose.yml` and detect the services.
-   - Go to the **Environment Variables** tab in Coolify and configure:
-     - `POSTGRES_PASSWORD`: Use a strong, secure password.
+1. **Create a New Project** in Easypanel:
+   - Navigate to your Easypanel dashboard and click **Create Project**. Name it (e.g., `stuntdruk`).
+2. **Create a Compose Service**:
+   - Inside the project, click **Create Service** and select **Compose Service**.
+3. **Repository Details**:
+   - Select **Git** as the source type and enter your repository details:
+     - Repository: `https://github.com/bust3rnl2023/stuntdruk`
+     - Branch: `main`
+   - Easypanel will automatically read the `docker-compose.yml` file from the root.
+4. **Configure Environment Variables**:
+   - In the service configuration under the **Environment** tab, define the required variables:
+     - `POSTGRES_PASSWORD`: A strong, secure password.
      - `POSTGRES_DB`: `stuntdruk`
-     - `JWT_SECRET`: Generate a cryptographically secure random secret string.
+     - `JWT_SECRET`: A long, random secret for token signing.
      - `JWT_EXPIRES_IN`: `24h`
-4. **Networking**:
-   - Coolify automatically configures Traefik to route domain traffic to your web service.
-   - Point your domain/subdomain (e.g., `api.yourdomain.com`) to the `web` service.
-   - Under the web service settings, configure the destination port to `8080`. Coolify will handle SSL and route traffic appropriately.
-5. **Database Persistence**:
-   - The PostgreSQL container uses a named Docker volume (`pg_data`) mapped to `/var/lib/postgresql/data`. This ensures database files are kept safe between container restarts and redeployments.
+5. **Domain Binding & Routing**:
+   - Once the services are running, go to the **Domains** tab in the Easypanel service dashboard.
+   - Add your custom domain (e.g., `api.yourdomain.com`).
+   - Map it to the `web` container on the internal port `8080`.
+   - Easypanel's built-in Traefik proxy will handle SSL certificates via Let's Encrypt and route all traffic to the Express API container internally without exposing the raw port publicly.
+6. **Data Persistence**:
+   - The PostgreSQL service uses a named Docker volume (`pg_data`) which Easypanel mounts securely to ensure data remains persistent between updates and redeployments.
