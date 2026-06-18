@@ -65,6 +65,7 @@ export interface AuthRequest extends Request {
     id: number;
     uid: string;
     email: string;
+    role: string;
   };
 }
 
@@ -89,10 +90,21 @@ export const requireAuth = async (
       if (dbUser.length === 0) {
         return res.status(401).json({ error: 'Unauthorized: User not found in database' });
       }
+
+      let userObj = dbUser[0];
+      // Auto-promote bastiaanh79@gmail.com or admin@stuntdruk.nl to admin for VPS easypanel setup convenience
+      if ((userObj.email === 'bastiaanh79@gmail.com' || userObj.email === 'admin@stuntdruk.nl') && userObj.role !== 'admin') {
+        const updated = await db.update(users).set({ role: 'admin' }).where(eq(users.id, userObj.id)).returning();
+        if (updated.length > 0) {
+          userObj = updated[0];
+        }
+      }
+
       req.user = {
-        id: dbUser[0].id,
-        uid: dbUser[0].uid,
-        email: dbUser[0].email,
+        id: userObj.id,
+        uid: userObj.uid,
+        email: userObj.email,
+        role: userObj.role || 'customer',
       };
       return next();
     } catch (err) {
@@ -110,16 +122,21 @@ export const requireAuth = async (
       return res.status(401).json({ error: 'Unauthorized: Missing email in token' });
     }
 
+    // Determine initial role
+    const initialRole = (email === 'bastiaanh79@gmail.com' || email === 'admin@stuntdruk.nl') ? 'admin' : 'customer';
+
     // Get or Create user in Postgres
     const result = await db.insert(users)
       .values({
         uid,
         email,
+        role: initialRole,
       })
       .onConflictDoUpdate({
         target: users.uid,
         set: {
           email,
+          role: initialRole, // Auto sync role if changed
         },
       })
       .returning();
@@ -129,10 +146,26 @@ export const requireAuth = async (
       id: dbUser.id,
       uid: dbUser.uid,
       email: dbUser.email,
+      role: dbUser.role || 'customer',
     };
     next();
   } catch (error) {
     console.error('Error verifying Firebase ID token:', error);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
+};
+
+// 4. Require Admin Middleware
+export const requireAdmin = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  await requireAuth(req, res, () => {
+    if (req.user && req.user.role === 'admin') {
+      next();
+    } else {
+      res.status(403).json({ error: 'Forbidden: Admin access only' });
+    }
+  });
 };

@@ -8,8 +8,8 @@ import {
 } from './src/components/productData.ts';
 import { ProductType, SelectedConfiguration } from './src/types';
 import { db } from './src/db/index.ts';
-import { requireAuth, AuthRequest, hashPassword, comparePassword, generateToken } from './src/middleware/auth.ts';
-import { users, carts, orders } from './src/db/schema.ts';
+import { requireAuth, requireAdmin, AuthRequest, hashPassword, comparePassword, generateToken } from './src/middleware/auth.ts';
+import { users, carts, orders, products } from './src/db/schema.ts';
 import { eq, desc } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { createMollieClient } from '@mollie/api-client';
@@ -55,14 +55,71 @@ async function startServer() {
     res.json({ status: 'healthy', version: '1.0.0', service: 'stuntdruk-api' });
   });
 
+  // Dynamic Specifications Getter and Seeder
+  const getProductSpecs = async (key: ProductType): Promise<any> => {
+    try {
+      const dbProduct = await db.select().from(products).where(eq(products.key, key)).limit(1);
+      if (dbProduct.length > 0) {
+        return {
+          name: dbProduct[0].name,
+          sizes: dbProduct[0].sizes as any[],
+          paperTypes: dbProduct[0].paperTypes as any[],
+          printings: dbProduct[0].printings as any[],
+          finishings: dbProduct[0].finishings as any[],
+          quantities: dbProduct[0].quantities as any[]
+        };
+      }
+    } catch (err) {
+      console.error(`Database specs lookup failed for key ${key}, falling back to static specs:`, err);
+    }
+    return PRODUCT_SPECIFICATIONS[key];
+  };
+
+  const getSpecsFromDb = async (): Promise<any[]> => {
+    try {
+      const dbProducts = await db.select().from(products);
+      if (dbProducts.length === 0) {
+        const seeded = [];
+        for (const [key, spec] of Object.entries(PRODUCT_SPECIFICATIONS)) {
+          const inserted = await db.insert(products).values({
+            key,
+            name: spec.name,
+            sizes: spec.sizes,
+            paperTypes: spec.paperTypes,
+            printings: spec.printings,
+            finishings: spec.finishings,
+            quantities: spec.quantities,
+          }).returning();
+          seeded.push(inserted[0]);
+        }
+        return seeded;
+      }
+      return dbProducts;
+    } catch (err) {
+      console.error("Failed to fetch or seed products:", err);
+      return Object.entries(PRODUCT_SPECIFICATIONS).map(([key, spec], index) => ({
+        id: index + 1,
+        key,
+        name: spec.name,
+        sizes: spec.sizes,
+        paperTypes: spec.paperTypes,
+        printings: spec.printings,
+        finishings: spec.finishings,
+        quantities: spec.quantities,
+        createdAt: new Date(),
+      }));
+    }
+  };
+
   // 1. Dynamic Configurator API Configuration Getter
   // Evaluates options with smart graying out/notices
-  app.get('/api/configurator', (req: Request, res: Response) => {
+  app.get('/api/configurator', async (req: Request, res: Response) => {
     try {
       const { productType } = req.query;
       const validProductType = productType as ProductType;
       
-      if (!productType || !PRODUCT_SPECIFICATIONS[validProductType]) {
+      const sourceSpecs = await getProductSpecs(validProductType);
+      if (!productType || !sourceSpecs) {
         res.status(400).json({ error: 'Valid productType query parameter is required.' });
         return;
       }
@@ -78,35 +135,33 @@ async function startServer() {
         height: (req.query.height as string) || '1.0'
       };
 
-      const sourceSpecs = PRODUCT_SPECIFICATIONS[validProductType];
-
       // Validate inputs and get notice corrections
       const { corrected, notices } = validateAndCorrectConfiguration(
         validProductType, 
-        currentConfig
+        currentConfig,
+        sourceSpecs
       );
 
       // Enhance options with dynamic compatibilities
-      // E.g. Add informative tags directly on options if disabled under current paperType
-      const enhancedSizes = sourceSpecs.sizes.map(s => ({
+      const enhancedSizes = sourceSpecs.sizes.map((s: any) => ({
         ...s,
         disabled: false,
         disabledReason: ''
       }));
 
-      const enhancedPaperTypes = sourceSpecs.paperTypes.map(p => ({
+      const enhancedPaperTypes = sourceSpecs.paperTypes.map((p: any) => ({
         ...p,
         disabled: false,
         disabledReason: ''
       }));
 
-      const enhancedPrintings = sourceSpecs.printings.map(pr => ({
+      const enhancedPrintings = sourceSpecs.printings.map((pr: any) => ({
         ...pr,
         disabled: false,
         disabledReason: ''
       }));
 
-      const enhancedFinishings = sourceSpecs.finishings.map(f => {
+      const enhancedFinishings = sourceSpecs.finishings.map((f: any) => {
         let disabled = false;
         let disabledReason = '';
 
@@ -129,7 +184,7 @@ async function startServer() {
         };
       });
 
-      const enhancedQuantities = sourceSpecs.quantities.map(q => ({
+      const enhancedQuantities = sourceSpecs.quantities.map((q: any) => ({
         ...q,
         disabled: false,
         disabledReason: ''
@@ -154,12 +209,13 @@ async function startServer() {
   });
 
   // 2. Heavy-Duty Surcharge and Pricing API
-  app.post('/api/pricing', (req: Request, res: Response) => {
+  app.post('/api/pricing', async (req: Request, res: Response) => {
     try {
       const { productType, configuration, isExpress } = req.body;
       const validProductType = productType as ProductType;
 
-      if (!productType || !PRODUCT_SPECIFICATIONS[validProductType]) {
+      const sourceSpecs = await getProductSpecs(validProductType);
+      if (!productType || !sourceSpecs) {
         res.status(400).json({ error: 'Valid productType is required.' });
         return;
       }
@@ -174,7 +230,8 @@ async function startServer() {
         validProductType,
         configuration as SelectedConfiguration,
         !!isExpress,
-        currentDate
+        currentDate,
+        sourceSpecs
       );
 
       res.json(pricingResponse);
@@ -222,6 +279,7 @@ async function startServer() {
           uid: newUser[0].uid,
           email: newUser[0].email,
           fullName: newUser[0].fullName,
+          role: newUser[0].role || 'customer',
         },
       });
     } catch (error) {
@@ -274,6 +332,7 @@ async function startServer() {
           postalCode: user.postalCode || '',
           city: user.city || '',
           country: user.country || 'Nederland',
+          role: user.role || 'customer',
         }
       });
     } catch (error) {
@@ -301,6 +360,7 @@ async function startServer() {
         postalCode: user.postalCode || '',
         city: user.city || '',
         country: user.country || 'Nederland',
+        role: user.role || 'customer',
       });
     } catch (error) {
       console.error("Fout bij ophalen profiel:", error);
@@ -469,6 +529,262 @@ async function startServer() {
     } catch (error) {
       console.error("Failed to load latest order from database:", error);
       res.status(500).json({ error: "Failed to load order from PostgreSQL." });
+    }
+  });
+
+  // ================= ADMIN & USER/PRODUCT MANAGEMENT ENDPOINTS =================
+
+  // 1. Get All Products (Dynamic and Seeding fallback) - available to everyone but writeable to admins
+  app.get('/api/products', async (req: Request, res: Response) => {
+    try {
+      const prods = await getSpecsFromDb();
+      res.json(prods);
+    } catch (err) {
+      console.error("Admin API Products Get Fail:", err);
+      res.status(500).json({ error: "Ophalen van producten mislukt." });
+    }
+  });
+
+  // 2. Admin metrics: Dashboard summary
+  app.get('/api/admin/metrics', requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      // Fetch total users
+      const totalUsersResult = await db.select().from(users);
+      const totalUsers = totalUsersResult.length;
+
+      // Fetch all orders
+      const allOrders = await db.select().from(orders);
+      
+      let totalSales = 0;
+      let completedCount = 0;
+      let processingCount = 0;
+      
+      allOrders.forEach(o => {
+        const totalNum = parseFloat(o.total);
+        if (!isNaN(totalNum)) {
+          totalSales += totalNum;
+        }
+        if (o.status === 'completed') {
+          completedCount++;
+        } else {
+          processingCount++;
+        }
+      });
+
+      // Get count of products in DB
+      const prods = await getSpecsFromDb();
+      const totalProductsCount = prods.length;
+
+      // Group orders by date (last 7 days) for chart
+      const salesLast7Days: Record<string, number> = {};
+      const orderCountsLast7Days: Record<string, number> = {};
+      const currentDate = new Date();
+      
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(currentDate.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        salesLast7Days[key] = 0;
+        orderCountsLast7Days[key] = 0;
+      }
+
+      allOrders.forEach(o => {
+        if (o.createdAt) {
+          const dateStr = new Date(o.createdAt).toISOString().split('T')[0];
+          if (dateStr in salesLast7Days) {
+            salesLast7Days[dateStr] += parseFloat(o.total) || 0;
+            orderCountsLast7Days[dateStr]++;
+          }
+        }
+      });
+
+      const chartsData = Object.keys(salesLast7Days).map(k => ({
+        date: k,
+        sales: Math.round(salesLast7Days[k] * 105) / 100, // tiny rounding / scaling
+        orders: orderCountsLast7Days[k]
+      }));
+
+      res.json({
+        totalSales: Math.round(totalSales * 100) / 100,
+        totalOrders: allOrders.length,
+        completedOrders: completedCount,
+        processingOrders: processingCount,
+        totalUsers,
+        totalProductsCount,
+        chartsData
+      });
+    } catch (err) {
+      console.error("Failed to load metrics:", err);
+      res.status(500).json({ error: "Kon metrische gegevens niet laden." });
+    }
+  });
+
+  // 3. User & Customer Management: List all registered customers and their orders
+  app.get('/api/admin/users', requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+      const allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
+
+      // Map users to include their order history
+      const usersWithOrders = allUsers.map(u => {
+        const userOrders = allOrders.filter(o => o.userId === u.id);
+        const orderHistory = userOrders.map(o => ({
+          id: o.id,
+          total: parseFloat(o.total) || 0,
+          status: o.status,
+          createdAt: o.createdAt,
+          paymentMethod: o.paymentMethod,
+          items: o.items
+        }));
+
+        return {
+          id: u.id,
+          uid: u.uid,
+          email: u.email,
+          fullName: u.fullName || 'Onbekend',
+          role: u.role,
+          phone: u.phone || '',
+          address: u.address || '',
+          postalCode: u.postalCode || '',
+          city: u.city || '',
+          country: u.country || 'Nederland',
+          createdAt: u.createdAt,
+          ordersCount: userOrders.length,
+          totalSpent: orderHistory.reduce((s, o) => s + o.total, 0),
+          orderHistory
+        };
+      });
+
+      res.json(usersWithOrders);
+    } catch (err) {
+      console.error("Failed to load users for admin:", err);
+      res.status(500).json({ error: "Fout bij ophalen van klantenbestand." });
+    }
+  });
+
+  // 4. Order Management: List all orders in the shop
+  app.get('/api/admin/orders', requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
+      const allUsers = await db.select().from(users);
+
+      const ordersWithUser = allOrders.map(o => {
+        const u = allUsers.find(user => user.id === o.userId);
+        return {
+          ...o,
+          total: parseFloat(o.total) || 0,
+          customerEmail: u?.email || 'Gast / Onbekend',
+          customerName: u?.fullName || 'Onbekend'
+        };
+      });
+
+      res.json(ordersWithUser);
+    } catch (err) {
+      console.error("Failed to load orders for admin:", err);
+      res.status(500).json({ error: "Fout bij ophalen van bestellingen." });
+    }
+  });
+
+  // 5. Order Management: Update order status
+  app.post('/api/admin/orders/:id/status', requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ error: "Orderstatus is verplicht." });
+      }
+
+      const updated = await db.update(orders)
+        .set({ status })
+        .where(eq(orders.id, id))
+        .returning();
+
+      if (updated.length === 0) {
+        return res.status(404).json({ error: "Bestelling niet gevonden." });
+      }
+
+      res.json({ success: true, order: updated[0] });
+    } catch (err) {
+      console.error("Failed to update order status:", err);
+      res.status(500).json({ error: "Wijzigen van status mislukt." });
+    }
+  });
+
+  // 6. Product Management: Add a product specification dynamically
+  app.post('/api/admin/products', requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const { key, name, sizes, paperTypes, printings, finishings, quantities } = req.body;
+
+      if (!key || !name || !sizes || !paperTypes || !printings || !finishings || !quantities) {
+        return res.status(400).json({ error: "Minstens één verplicht specificatieveld is onvolledig." });
+      }
+
+      const newProd = await db.insert(products)
+        .values({
+          key: key.toLowerCase().trim(),
+          name,
+          sizes,
+          paperTypes,
+          printings,
+          finishings,
+          quantities
+        })
+        .returning();
+
+      res.status(201).json({ success: true, product: newProd[0] });
+    } catch (err) {
+      console.error("Failed to insert product spec:", err);
+      res.status(500).json({ error: "Toevoegen van product is mislukt. Mogelijk bestaat deze sleutel al." });
+    }
+  });
+
+  // 7. Product Management: Adjust an existing product specification
+  app.put('/api/admin/products/:key', requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const key = req.params.key;
+      const { name, sizes, paperTypes, printings, finishings, quantities } = req.body;
+
+      const updated = await db.update(products)
+        .set({
+          name,
+          sizes,
+          paperTypes,
+          printings,
+          finishings,
+          quantities
+        })
+        .where(eq(products.key, key))
+        .returning();
+
+      if (updated.length === 0) {
+        return res.status(404).json({ error: "Product niet gevonden." });
+      }
+
+      res.json({ success: true, product: updated[0] });
+    } catch (err) {
+      console.error("Failed to update product spec:", err);
+      res.status(500).json({ error: "Aanpassen van product is mislukt." });
+    }
+  });
+
+  // 8. Product Management: Remove an existing product
+  app.delete('/api/admin/products/:key', requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const key = req.params.key;
+
+      const deleted = await db.delete(products)
+        .where(eq(products.key, key))
+        .returning();
+
+      if (deleted.length === 0) {
+        return res.status(404).json({ error: "Product niet gevonden." });
+      }
+
+      res.json({ success: true, deletedKey: key });
+    } catch (err) {
+      console.error("Failed to delete product spec:", err);
+      res.status(500).json({ error: "Verwijderen van product is mislukt." });
     }
   });
 

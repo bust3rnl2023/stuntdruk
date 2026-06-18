@@ -10,8 +10,8 @@ interface HeaderProps {
   currentUser: any;
   activeCategory: ProductType;
   setActiveCategory: (cat: ProductType) => void;
-  currentView: 'home' | 'configurator';
-  setCurrentView: (view: 'home' | 'configurator') => void;
+  currentView: 'home' | 'configurator' | 'admin';
+  setCurrentView: (view: 'home' | 'configurator' | 'admin') => void;
   onLoginClick: () => void;
   onProfileClick: () => void;
   onOrdersClick: () => void;
@@ -288,6 +288,16 @@ export function Header(props: HeaderProps) {
                       <FileText className="h-4 w-4 text-slate-400" />
                       <span>Mijn Bestellingen</span>
                     </button>
+
+                    {props.currentUser?.role === 'admin' && (
+                      <button
+                        onClick={() => { props.setCurrentView('admin'); setDropdownOpen(false); }}
+                        className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-left text-xs font-bold text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer"
+                      >
+                        <Cpu className="h-4 w-4 text-indigo-550" />
+                        <span>🔒 Beheerderspaneel</span>
+                      </button>
+                    )}
 
                     <div className="border-t border-slate-100 my-1"></div>
 

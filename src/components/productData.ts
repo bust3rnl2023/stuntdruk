@@ -505,12 +505,13 @@ export function formatDutchDate(date: Date): string {
 // Validation logic and Auto-Correction helper matching Drukwerkdeal behavior
 export function validateAndCorrectConfiguration(
   productType: ProductType, 
-  config: SelectedConfiguration
+  config: SelectedConfiguration,
+  customSpecs?: any
 ): { corrected: SelectedConfiguration; notices: { type: 'info' | 'warning' | 'error'; message: string }[] } {
   
   const corrected = { ...config };
   const notices: { type: 'info' | 'warning' | 'error'; message: string }[] = [];
-  const specs = PRODUCT_SPECIFICATIONS[productType];
+  const specs = customSpecs || PRODUCT_SPECIFICATIONS[productType];
 
   if (!specs) {
     return { corrected, notices };
@@ -569,10 +570,11 @@ export function calculateProductPrice(
   productType: ProductType,
   config: SelectedConfiguration,
   isExpress: boolean,
-  currentDateString: string
+  currentDateString: string,
+  customSpecs?: any
 ): PricingResponse {
-  const { corrected, notices } = validateAndCorrectConfiguration(productType, config);
-  const specs = PRODUCT_SPECIFICATIONS[productType];
+  const { corrected, notices } = validateAndCorrectConfiguration(productType, config, customSpecs);
+  const specs = customSpecs || PRODUCT_SPECIFICATIONS[productType];
 
   if (!specs) {
     return {

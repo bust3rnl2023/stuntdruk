@@ -30,6 +30,7 @@ import {
 } from './types';
 import { AuthModal } from './components/AuthModal';
 import { CustomerPortalModal } from './components/CustomerPortalModal';
+import { AdminPanel } from './components/AdminPanel';
 import { PRODUCT_SPECIFICATIONS } from './components/productData';
 import { 
   auth
@@ -91,7 +92,7 @@ export default function App() {
   }, []);
 
   // Interface view & state selectors
-  const [currentView, setCurrentView] = useState<'home' | 'configurator'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'configurator' | 'admin'>('home');
   const [activeCategory, setActiveCategory] = useState<ProductType>('business_card');
   const [isExpress, setIsExpress] = useState(false);
   
@@ -533,6 +534,14 @@ export default function App() {
           }}
           onStartConfiguring={() => {
             setCurrentView('configurator');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      ) : currentView === 'admin' ? (
+        <AdminPanel 
+          currentUser={currentUser} 
+          onBackToShopping={() => {
+            setCurrentView('home');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
         />
