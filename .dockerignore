@@ -1,0 +1,27 @@
+# Ignore node dependency directories
+node_modules
+npm-debug.log
+
+# Ignore local output builds
+dist
+build
+.next
+
+# Ignore local environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Ignore git directories and metadata
+.git
+.github
+.gitignore
+.dockerignore
+LICENSE
+README.md
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
