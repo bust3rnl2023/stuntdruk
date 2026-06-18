@@ -28,6 +28,8 @@ import {
   CartItem, 
   Order 
 } from './types';
+import { AuthModal } from './components/AuthModal';
+import { CustomerPortalModal } from './components/CustomerPortalModal';
 import { PRODUCT_SPECIFICATIONS } from './components/productData';
 import { 
   auth
@@ -48,8 +50,45 @@ import {
 
 export default function App() {
   // Account & Authentication State
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // Custom client-side portal controllers
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false);
+  const [portalTab, setPortalTab] = useState<'profile' | 'orders'>('profile');
+
+  // Restore Custom E-mail/Password user session from localStorage
+  useEffect(() => {
+    const cached = localStorage.getItem('stuntdruk_custom_user');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        parsed.getIdToken = async () => parsed.token;
+        setCurrentUser(parsed);
+        
+        // Quietly fetch current SQL state to keep details refreshed
+        fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${parsed.token}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data && !data.error) {
+            const updated = {
+              ...parsed,
+              ...data,
+              getIdToken: async () => parsed.token
+            };
+            localStorage.setItem('stuntdruk_custom_user', JSON.stringify(updated));
+            setCurrentUser(updated);
+          }
+        })
+        .catch(err => console.log("Silent credential synchronization failed:", err));
+      } catch (err) {
+        console.error("Failed to restore cached custom details:", err);
+      }
+    }
+  }, []);
 
   // Interface view & state selectors
   const [currentView, setCurrentView] = useState<'home' | 'configurator'>('home');
@@ -414,6 +453,15 @@ export default function App() {
         setActiveCategory={setActiveCategory}
         currentView={currentView}
         setCurrentView={setCurrentView}
+        onLoginClick={() => setAuthModalOpen(true)}
+        onProfileClick={() => { setPortalTab('profile'); setPortalOpen(true); }}
+        onOrdersClick={() => { setPortalTab('orders'); setPortalOpen(true); }}
+        onLogoutClick={() => { 
+          setCurrentUser(null); 
+          localStorage.removeItem('stuntdruk_custom_user');
+          setCartItems([]);
+          localStorage.setItem('stuntdruk_local_cart', JSON.stringify([]));
+        }}
       />
 
       {completedOrder ? (
@@ -582,6 +630,19 @@ export default function App() {
         cartItems={cartItems}
         currentUser={currentUser}
         onOrderCompleted={handleOrderSubmitted}
+      />
+
+      <AuthModal 
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onLoginSuccess={(usr) => setCurrentUser(usr)}
+      />
+
+      <CustomerPortalModal 
+        isOpen={portalOpen}
+        onClose={() => setPortalOpen(false)}
+        currentUser={currentUser}
+        onProfileUpdated={(usr) => setCurrentUser(usr)}
       />
 
     </div>

@@ -8,7 +8,7 @@ import {
 } from './src/components/productData.ts';
 import { ProductType, SelectedConfiguration } from './src/types';
 import { db } from './src/db/index.ts';
-import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
+import { requireAuth, AuthRequest, hashPassword, comparePassword, generateToken } from './src/middleware/auth.ts';
 import { users, carts, orders } from './src/db/schema.ts';
 import { eq, desc } from 'drizzle-orm';
 import Stripe from 'stripe';
@@ -184,7 +184,182 @@ async function startServer() {
     }
   });
 
-  // 3. PostgreSQL backend routes secure-guarded by Firebase Authentication
+  // 3. PostgreSQL backend routes secure-guarded by Firebase or Custom Authentication
+  // 3.01. Register Custom User (PostgreSQL password hashing)
+  app.post('/api/auth/register', async (req: Request, res: Response) => {
+    try {
+      const { email, password, fullName } = req.body;
+
+      if (!email || !password || !fullName) {
+        return res.status(400).json({ error: "E-mail, wachtwoord en volledige naam zijn verplicht." });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check if user already exists
+      const existingUser = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+      if (existingUser.length > 0) {
+        return res.status(400).json({ error: "Dit e-mailadres is al in gebruik." });
+      }
+
+      // Hash password securely in SQL database
+      const passwordHash = hashPassword(password);
+      const localUid = `local-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+      const newUser = await db.insert(users)
+        .values({
+          uid: localUid,
+          email: normalizedEmail,
+          passwordHash,
+          fullName,
+        })
+        .returning();
+
+      res.status(201).json({
+        success: true,
+        user: {
+          id: newUser[0].id,
+          uid: newUser[0].uid,
+          email: newUser[0].email,
+          fullName: newUser[0].fullName,
+        },
+      });
+    } catch (error) {
+      console.error("Registratiefout:", error);
+      res.status(500).json({ error: "Registratie is mislukt door een serverfout." });
+    }
+  });
+
+  // 3.02. Login Custom User (PostgreSQL password matching)
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "E-mail en wachtwoord zijn verplichte velden." });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Find user
+      const userList = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+      if (userList.length === 0) {
+        return res.status(401).json({ error: "E-mailadres of wachtwoord is onjuist." });
+      }
+
+      const user = userList[0];
+      if (!user.passwordHash) {
+        return res.status(400).json({ error: "Dit account maakt gebruik van Google Sign-In. Log in via Google of registreer een nieuw e-mail-account." });
+      }
+
+      // Compare secure passwords
+      const isMatch = comparePassword(password, user.passwordHash);
+      if (!isMatch) {
+        return res.status(401).json({ error: "E-mailadres of wachtwoord is onjuist." });
+      }
+
+      // Sign custom JWT token
+      const token = generateToken({ id: user.id, uid: user.uid, email: user.email });
+
+      res.json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          uid: user.uid,
+          email: user.email,
+          fullName: user.fullName || '',
+          phone: user.phone || '',
+          address: user.address || '',
+          postalCode: user.postalCode || '',
+          city: user.city || '',
+          country: user.country || 'Nederland',
+        }
+      });
+    } catch (error) {
+      console.error("Inlogfout:", error);
+      res.status(500).json({ error: "Inloggen is mislukt door een serverfout." });
+    }
+  });
+
+  // 3.03. Get current customer profile info
+  app.get('/api/auth/me', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userList = await db.select().from(users).where(eq(users.id, req.user!.id)).limit(1);
+      if (userList.length === 0) {
+        return res.status(404).json({ error: "Gebruiker niet gevonden." });
+      }
+
+      const user = userList[0];
+      res.json({
+        id: user.id,
+        uid: user.uid,
+        email: user.email,
+        fullName: user.fullName || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        postalCode: user.postalCode || '',
+        city: user.city || '',
+        country: user.country || 'Nederland',
+      });
+    } catch (error) {
+      console.error("Fout bij ophalen profiel:", error);
+      res.status(500).json({ error: "Ophalen van profielgegevens is mislukt." });
+    }
+  });
+
+  // 3.04. Update current customer profile info
+  app.post('/api/auth/profile', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { fullName, phone, address, postalCode, city, country } = req.body;
+
+      const updated = await db.update(users)
+        .set({
+          fullName: fullName || '',
+          phone: phone || '',
+          address: address || '',
+          postalCode: postalCode || '',
+          city: city || '',
+          country: country || 'Nederland',
+        })
+        .where(eq(users.id, req.user!.id))
+        .returning();
+
+      res.json({
+        success: true,
+        user: {
+          id: updated[0].id,
+          uid: updated[0].uid,
+          email: updated[0].email,
+          fullName: updated[0].fullName || '',
+          phone: updated[0].phone || '',
+          address: updated[0].address || '',
+          postalCode: updated[0].postalCode || '',
+          city: updated[0].city || '',
+          country: updated[0].country || 'Nederland',
+        }
+      });
+    } catch (error) {
+      console.error("Fout bij bijwerken profiel:", error);
+      res.status(500).json({ error: "Bijwerken van profielgegevens is mislukt." });
+    }
+  });
+
+  // 3.05. Retrieve all orders for the authenticated customer
+  app.get('/api/orders', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userOrders = await db.select()
+        .from(orders)
+        .where(eq(orders.userId, req.user!.id))
+        .orderBy(desc(orders.createdAt));
+
+      res.json(userOrders);
+    } catch (error) {
+      console.error("Failed to load user orders list:", error);
+      res.status(500).json({ error: "Failed to load orders from PostgreSQL" });
+    }
+  });
+
   app.get('/api/cart', requireAuth, async (req: AuthRequest, res) => {
     try {
       const dbCart = await db.select()

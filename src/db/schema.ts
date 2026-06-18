@@ -4,9 +4,16 @@ import { integer, pgTable, serial, text, timestamp, jsonb, numeric } from 'drizz
 // Define 'users' table
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  uid: text('uid').notNull().unique(), // Firebase Auth UID
+  uid: text('uid').notNull().unique(), // Firebase Auth UID or local-${timestamp}
   email: text('email').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
+  passwordHash: text('password_hash'),
+  fullName: text('full_name'),
+  phone: text('phone'),
+  address: text('address'),
+  postalCode: text('postal_code'),
+  city: text('city'),
+  country: text('country'),
 });
 
 // Define 'carts' table with a foreign key to 'users'

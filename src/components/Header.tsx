@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, LogIn, LogOut, User, Printer, Cpu, ChevronDown } from 'lucide-react';
+import { ShoppingCart, LogIn, LogOut, User, Printer, Cpu, ChevronDown, FileText } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { ProductType } from '../types';
@@ -12,23 +12,24 @@ interface HeaderProps {
   setActiveCategory: (cat: ProductType) => void;
   currentView: 'home' | 'configurator';
   setCurrentView: (view: 'home' | 'configurator') => void;
+  onLoginClick: () => void;
+  onProfileClick: () => void;
+  onOrdersClick: () => void;
+  onLogoutClick: () => void;
 }
 
 export function Header(props: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [prodMenuOpen, setProdMenuOpen] = useState(false);
 
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err) {
-      console.error("Login failed:", err);
-    }
+  const handleLogin = () => {
+    props.onLoginClick();
   };
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      props.onLogoutClick();
       setDropdownOpen(false);
     } catch (err) {
       console.error("Logout failed:", err);
@@ -266,15 +267,34 @@ export function Header(props: HeaderProps) {
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-52 origin-top-right rounded-lg border border-slate-100 bg-white p-1 shadow-lg ring-1 ring-black/5 animate-fade-in z-50">
+                  <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg border border-slate-100 bg-white p-1 shadow-lg ring-1 ring-black/5 animate-fade-in z-50">
                     <div className="px-3 py-2 border-b border-slate-50">
                       <p className="text-xs text-slate-400">Ingelogd als</p>
                       <p className="truncate text-xs font-bold text-slate-700">{props.currentUser.email}</p>
                     </div>
+                    
+                    <button
+                      onClick={() => { props.onProfileClick(); setDropdownOpen(false); }}
+                      className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <User className="h-4 w-4 text-slate-400" />
+                      <span>Mijn Profiel / Gegevens</span>
+                    </button>
+
+                    <button
+                      onClick={() => { props.onOrdersClick(); setDropdownOpen(false); }}
+                      className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <FileText className="h-4 w-4 text-slate-400" />
+                      <span>Mijn Bestellingen</span>
+                    </button>
+
+                    <div className="border-t border-slate-100 my-1"></div>
+
                     <button
                       id="auth-logout-btn"
                       onClick={handleLogout}
-                      className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+                      className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     >
                       <LogOut className="h-4 w-4" />
                       <span>Uitloggen</span>
