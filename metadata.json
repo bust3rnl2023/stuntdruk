@@ -1,0 +1,6 @@
+{
+  "name": "Stuntdruk",
+  "description": "Een professionele full-stack online drukwerk configurator geïnspireerd door Drukwerkdeal, met dynamische controle van papiersoorten, luxe veredeling en realtime prijsberekeningen.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

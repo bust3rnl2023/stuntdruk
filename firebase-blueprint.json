@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Represents a completed print order made by a customer at stuntdruk.nl.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique order identifier"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The Firestore auth user ID who placed the order (optional for guest checkout)"
+        },
+        "items": {
+          "type": "array",
+          "description": "The ordered items / print configurations"
+        },
+        "shippingAddress": {
+          "type": "object",
+          "description": "The standard Dutch/Belgian address format"
+        },
+        "billingAddressSame": {
+          "type": "boolean"
+        },
+        "billingAddress": {
+          "type": "object"
+        },
+        "pricing": {
+          "type": "object",
+          "description": "VAT/GST Net, Gross pricing details"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["ideal", "bancontact", "creditcard", "paypal"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "processing", "shipped", "delivered"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "items", "shippingAddress", "pricing", "paymentMethod", "status", "createdAt"]
+    },
+    "Cart": {
+      "title": "UserCart",
+      "description": "Stores user shopping cart items dynamically synced across devices.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User session ID or Auth ID"
+        },
+        "items": {
+          "type": "array",
+          "description": "Array of configured CartItems"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "items", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Highly secure orders collection storing print configurations and addresses."
+    },
+    "carts/{userId}": {
+      "schema": "Cart",
+      "description": "Holds items in the active cart, matching current layout constraints."
+    }
+  }
+}

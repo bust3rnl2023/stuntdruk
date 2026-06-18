@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Strict Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Safety Primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 3. Entity-Specific Hardened Validation Helpers
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'items', 'pricing', 'paymentMethod', 'status', 'createdAt'])
+        && data.id is string && data.id.size() <= 128
+        && data.items is list && data.items.size() <= 20
+        && data.pricing is map
+        && data.shippingAddress is map
+        && data.paymentMethod is string && data.paymentMethod in ['ideal', 'bancontact', 'creditcard', 'paypal']
+        && data.status is string && data.status == 'pending'
+        && data.createdAt == request.time;
+    }
+
+    function isValidCart(data) {
+      return data.keys().hasAll(['userId', 'items', 'updatedAt'])
+        && data.keys().size() == 3
+        && data.userId is string && data.userId.size() <= 128
+        && data.items is list && data.items.size() <= 50
+        && data.updatedAt == request.time;
+    }
+
+    // 4. Schema Mapped Collection Gates
+    match /orders/{orderId} {
+      // Allow creation of pending orders. If userId exists, verify it matches
+      allow create: if isValidId(orderId) 
+        && isValidOrder(incoming()) 
+        && (
+          !incoming().keys().hasAll(['userId']) || 
+          (isSignedIn() && incoming().userId == request.auth.uid)
+        );
+
+      // Only the authenticated order owner can retrieve or list orders
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /carts/{userId} {
+      // Restrict access based on identity. If signed-in, must match Auth UID. Otherwise, permits guest access.
+      allow get: if isValidId(userId) 
+        && (
+          !isSignedIn() || 
+          userId == request.auth.uid
+        );
+      
+      allow create, update: if isValidId(userId) 
+        && isValidCart(incoming()) 
+        && (
+          !isSignedIn() || 
+          incoming().userId == request.auth.uid
+        );
+      
+      allow delete: if isValidId(userId) 
+        && (
+          !isSignedIn() || 
+          existing().userId == request.auth.uid
+        );
+    }
+  }
+}
