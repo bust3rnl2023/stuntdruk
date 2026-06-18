@@ -124,7 +124,7 @@ export function WelcomePage({ onSelectProduct, onStartConfiguring }: WelcomePage
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                     <span className="text-[8px] font-bold tracking-wider uppercase text-slate-300">Offset Pers Actief</span>
                   </div>
-                  <span className="text-[10px] text-fuchsia-400 font-black">Zwolle, NL</span>
+                  <span className="text-[10px] text-fuchsia-400 font-black">Eerbeek, NL</span>
                 </div>
               </div>
             </div>
@@ -256,7 +256,7 @@ export function WelcomePage({ onSelectProduct, onStartConfiguring }: WelcomePage
             <div className="space-y-2">
               <h3 className="text-xl font-black text-slate-800 tracking-tight">Klantenservice & Drukkerij</h3>
               <p className="text-xs text-slate-500">
-                Heeft u specifieke vragen over uw bestanden of zoekt u een afwijkend formaat behang? Onze vakkundige medewerkers in Zwolle staan klaar om u persoonlijk te adviseren.
+                Heeft u specifieke vragen over uw bestanden of zoekt u een afwijkend formaat behang? Onze vakkundige medewerkers in Eerbeek staan klaar om u persoonlijk te adviseren.
               </p>
             </div>
 
@@ -264,11 +264,11 @@ export function WelcomePage({ onSelectProduct, onStartConfiguring }: WelcomePage
               <div className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-slate-800">Drukkerij Zwolle (Hoofdkantoor)</p>
+                  <p className="font-bold text-slate-800">Drukkerij Eerbeek (Hoofdkantoor)</p>
                   <p className="text-slate-500 text-[11px] leading-relaxed">
                     Stuntdruk.nl B.V.<br />
-                    Ampèrestraat 18<br />
-                    8013 PV Zwolle, Nederland
+                    Ruijgenbosweg 45<br />
+                    6961 GT Eerbeek, Nederland
                   </p>
                 </div>
               </div>
@@ -277,7 +277,7 @@ export function WelcomePage({ onSelectProduct, onStartConfiguring }: WelcomePage
                 <Phone className="h-5 w-5 text-indigo-600 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-800">Telefoon support</p>
-                  <p className="text-slate-500 text-[11px]">+31 (0)38 420 1234</p>
+                  <p className="text-slate-500 text-[11px]">(+31)6 48710464</p>
                 </div>
               </div>
 
@@ -285,7 +285,7 @@ export function WelcomePage({ onSelectProduct, onStartConfiguring }: WelcomePage
                 <Mail className="h-5 w-5 text-indigo-600 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-800">E-mailadres</p>
-                  <p className="text-slate-500 text-[11px]">support@stuntdruk.nl</p>
+                  <p className="text-slate-500 text-[11px]">info@stuntdruk.nl</p>
                 </div>
               </div>
             </div>
@@ -295,7 +295,7 @@ export function WelcomePage({ onSelectProduct, onStartConfiguring }: WelcomePage
           <div className="bg-slate-50 border border-slate-155 rounded-2xl p-6 space-y-4">
             <h4 className="font-bold text-xs text-slate-800 flex items-center gap-2">
               <Calendar className="h-4.5 w-4.5 text-indigo-600" />
-              <span>Openingstijden Zwolle</span>
+              <span>Openingstijden Eerbeek</span>
             </h4>
             
             <div className="divide-y divide-slate-150 text-[11px] font-bold text-slate-600">
