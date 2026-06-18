@@ -289,7 +289,7 @@ export function Header(props: HeaderProps) {
                       <span>Mijn Bestellingen</span>
                     </button>
 
-                    {props.currentUser?.role === 'admin' && (
+                    {(props.currentUser?.role === 'admin' || props.currentUser?.email === 'bastiaanh79@gmail.com' || props.currentUser?.email === 'admin@stuntdruk.nl') && (
                       <button
                         onClick={() => { props.setCurrentView('admin'); setDropdownOpen(false); }}
                         className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-left text-xs font-bold text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer"

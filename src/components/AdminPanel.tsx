@@ -41,7 +41,7 @@ interface AdminPanelProps {
 
 export function AdminPanel({ currentUser, onBackToShopping }: AdminPanelProps) {
   // Authorization Gate on client side
-  const isAdmin = currentUser && currentUser.role === 'admin';
+  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.email === 'bastiaanh79@gmail.com' || currentUser.email === 'admin@stuntdruk.nl');
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'customers' | 'orders'>('dashboard');
 
