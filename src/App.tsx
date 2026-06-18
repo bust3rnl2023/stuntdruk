@@ -130,8 +130,33 @@ export default function App() {
 
   // Track Authentication Changes via Client Auth Handlers
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const dbData = await res.json();
+            setCurrentUser({
+              ...user,
+              ...dbData,
+              getIdToken: async (forceRefresh?: boolean) => user.getIdToken(forceRefresh)
+            });
+          } else {
+            setCurrentUser(user);
+          }
+        } catch (err) {
+          console.error("Fout bij laden database profiel:", err);
+          setCurrentUser(user);
+        }
+      } else {
+        const cached = localStorage.getItem('stuntdruk_custom_user');
+        if (!cached) {
+          setCurrentUser(null);
+        }
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
